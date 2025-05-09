@@ -29,33 +29,33 @@ export const Content = () => {
   // (key, value) => (block_id, new content)
   const [changes, setChanges] = useState(defaultChanges)
 
-  useEffect(() => {
-    function messageRecieved(payload) {
-      console.log(payload)
-    }
+  // useEffect(() => {
+  //   function messageRecieved(payload) {
+  //     console.log(payload)
+  //   }
 
-    if (blocks.length && blocks[0]['documents']['shared_id']) {
-      const shared_id = blocks[0]['documents']['shared_id']
+  //   if (blocks.length && blocks[0]['documents']['shared_id']) {
+  //     const shared_id = blocks[0]['documents']['shared_id']
 
-      if (shared_id) {
-        const myChannel = supabase.channel(`document:${shared_id}`)
-        myChannel
-          .on(
-            'broadcast',
-            {event: 'shout'},
-            messageRecieved
-          )
-          .subscribe()
-      }
-      else {
-        const myChannel = supabase.channel(`document:${shared_id}`)
-        myChannel
-          .unsubscribe()
-      }
-      // Unsubscribe from channel
-      return () => supabase.channel(`document:${shared_id}`).unsubscribe()
-    }
-  }, [blocks])
+  //     if (shared_id) {
+  //       const myChannel = supabase.channel(`document:${shared_id}`)
+  //       myChannel
+  //         .on(
+  //           'broadcast',
+  //           {event: 'shout'},
+  //           messageRecieved
+  //         )
+  //         .subscribe()
+  //     }
+  //     else {
+  //       const myChannel = supabase.channel(`document:${shared_id}`)
+  //       myChannel
+  //         .unsubscribe()
+  //     }
+  //     // Unsubscribe from channel
+  //     return () => supabase.channel(`document:${shared_id}`).unsubscribe()
+  //   }
+  // }, [blocks])
 
   async function manualSave() {
     if (Object.keys(changes['updates']).length || Object.keys(changes['positions']).length || changes['deletes'].length || changes['new_block'].length) {
@@ -213,8 +213,6 @@ export const Content = () => {
       </div>
     )
   }
-
-  console.log("BLOCK: ", (blocks.length && blocks[0].documents.shared_id) ? blocks[0].documents.shared_id : "")
 
   return (
     <div className='h-full flex flex-col font-inter gap-1 justify-top items-center overflow-y-scroll'>

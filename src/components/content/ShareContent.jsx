@@ -28,34 +28,34 @@ export const ShareContent = () => {
   // (key, value) => (block_id, new content)
   const [changes, setChanges] = useState(defaultChanges)
 
-  useEffect(() => {
-    function messageRecieved(payload) {
-      console.log(payload)
-    }
+  // useEffect(() => {
+  //   function messageRecieved(payload) {
+  //     console.log(payload)
+  //   }
 
-    if (blocks.length && params.shared_id) {
-      const shared_id = params.shared_id
+  //   if (blocks.length && params.shared_id) {
+  //     const shared_id = params.shared_id
 
-      if (shared_id) {
-        const myChannel = supabase.channel(`document:${shared_id}`)
-        myChannel
-          .on(
-            'broadcast',
-            {event: 'shout'},
-            messageRecieved
-          )
-          .subscribe()
-      }
-      else {
-        const myChannel = supabase.channel(`document:${shared_id}`)
-        myChannel
-          .unsubscribe()
-      }
-    }
+  //     if (shared_id) {
+  //       const myChannel = supabase.channel(`document:${shared_id}`)
+  //       myChannel
+  //         .on(
+  //           'broadcast',
+  //           {event: 'shout'},
+  //           messageRecieved
+  //         )
+  //         .subscribe()
+  //     }
+  //     else {
+  //       const myChannel = supabase.channel(`document:${shared_id}`)
+  //       myChannel
+  //         .unsubscribe()
+  //     }
+  //   }
 
-    // Unsubscribe from channel
-    return () => supabase.channel(`document:${params.shared_id}`).unsubscribe()
-  }, [params.shared_id])
+  //   // Unsubscribe from channel
+  //   return () => supabase.channel(`document:${params.shared_id}`).unsubscribe()
+  // }, [params.shared_id])
 
   async function manualSave() {
     if (Object.keys(changes['updates']).length || Object.keys(changes['positions']).length || changes['deletes'].length || changes['new_block'].length) {
