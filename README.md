@@ -111,3 +111,11 @@ Heading: #d4d4d4
 text: #d4d4d4
 
 sidebar: #d4d4d4
+
+
+# Results
+
+Websocket: 
+- useEffect to register
+- On change send the change over
+- ...
