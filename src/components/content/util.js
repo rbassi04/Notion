@@ -8,3 +8,9 @@ export default function getMinPositionDistance (blocks) {
 
   return min
 }
+
+
+
+export function orderBlocks(blocks) {
+  return blocks.sort((a, b) => a.position - b.position);
+}

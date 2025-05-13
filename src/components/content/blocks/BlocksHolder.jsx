@@ -14,9 +14,7 @@ const defaultContent = {
   'image': ''
 }
 
-export const BlocksHolder = ({blocks, setBlocks, changes, setChanges, setError, setLoading}) => {
-  const {doc_id} = useParams()
-
+export const BlocksHolder = ({blocks, setBlocks, changes, setChanges, setError, setLoading, doc_id}) => {
 
   async function addBlock(type) {
     const changed_cloned = {...changes}
@@ -55,15 +53,16 @@ export const BlocksHolder = ({blocks, setBlocks, changes, setChanges, setError, 
           blocks.map(
             (block, idx) => 
               <BlockRenderer
-                key={block.id} 
+                key={block.id}
                 idx={idx}
                 block={block}
                 blocks={blocks}
                 setBlocks={setBlocks}
-                changes = {changes} 
-                setChanges={setChanges} 
-                setError={setError} 
-                setLoading={setLoading} 
+                changes = {changes}
+                setChanges={setChanges}
+                setError={setError}
+                setLoading={setLoading}
+                doc_id={doc_id}
               />
           )
         }

@@ -10,6 +10,7 @@ export const Document = ({currDocument, setWorkshop, workshop_id, admin}) => {
   const [renamePopup, setRenamePopup] = useState(false)
   const [newDocumentPopup, setNewDocumentPopup] = useState(false)
   const menuRef = useRef()
+  const navigate = useNavigate()
 
   const isLeafDocument = Object.keys(currDocument.children).length
 
@@ -200,6 +201,13 @@ export const Document = ({currDocument, setWorkshop, workshop_id, admin}) => {
 
     if (error) {
       setWorkshop(wkShop => ({...wkShop, error}))
+    } else {
+      navigate(0)
+      supabase.channel(`document:${currDocument.shared_id}`).send({
+            type: "broadcast",
+            event: 'share',
+            payload: "refresh"
+        })
     }
 
     // Provide the link

@@ -13,8 +13,7 @@ const defaultContent = {
 }
 
 // BlockRenderer.jsx
-export default function BlockRenderer({ idx, block, blocks, setBlocks, changes, setChanges }) {
-  const {doc_id} = useParams()
+export default function BlockRenderer({ idx, block, blocks, setBlocks, changes, setChanges, doc_id }) {
   const {attributes, listeners, setNodeRef, 
     transform, transition} = useSortable({id: block.id})
 

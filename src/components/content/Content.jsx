@@ -5,7 +5,7 @@ import BlockRenderer from './blocks/BlockRenderer';
 import { closestCorners, DndContext, useDroppable } from '@dnd-kit/core';
 import { BlocksHolder } from './blocks/BlocksHolder';
 import { arrayMove } from '@dnd-kit/sortable';
-import getMinPositionDistance from './util';
+import getMinPositionDistance, { orderBlocks } from './util';
 
 
 
@@ -24,38 +24,86 @@ export const Content = () => {
   const [blocks, setBlocks] = useState([])
   const [loading, setLoading] = useState(true)
   const [saved, setSaved] = useState(new Date())
+  const [sharedId, setSharedId] = useState(null)
 
 
   // (key, value) => (block_id, new content)
   const [changes, setChanges] = useState(defaultChanges)
 
-  // useEffect(() => {
-  //   function messageRecieved(payload) {
-  //     console.log(payload)
-  //   }
+  useEffect(() => {
+    function messageRecieved({payload}) {
+      broadcastSave(payload)
+    }
 
-  //   if (blocks.length && blocks[0]['documents']['shared_id']) {
-  //     const shared_id = blocks[0]['documents']['shared_id']
+    if (blocks.length && blocks[0]['documents']['shared_id']) {
+      const shared_id = blocks[0]['documents']['shared_id']
+      setSharedId(shared_id)
 
-  //     if (shared_id) {
-  //       const myChannel = supabase.channel(`document:${shared_id}`)
-  //       myChannel
-  //         .on(
-  //           'broadcast',
-  //           {event: 'shout'},
-  //           messageRecieved
-  //         )
-  //         .subscribe()
-  //     }
-  //     else {
-  //       const myChannel = supabase.channel(`document:${shared_id}`)
-  //       myChannel
-  //         .unsubscribe()
-  //     }
-  //     // Unsubscribe from channel
-  //     return () => supabase.channel(`document:${shared_id}`).unsubscribe()
-  //   }
-  // }, [blocks])
+      if (shared_id) {
+        const myChannel = supabase.channel(`document:${shared_id}`)
+        myChannel
+          .on(
+            'broadcast',
+            {event: 'changes'},
+            messageRecieved
+          )
+          .subscribe()
+      }
+      else {
+        const myChannel = supabase.channel(`document:${shared_id}`)
+        myChannel
+          .unsubscribe()
+        
+        setSharedId(false)
+      }
+      // Unsubscribe from channel
+      return () => supabase.channel(`document:${shared_id}`).unsubscribe()
+    }
+  }, [blocks])
+
+
+  function broadcastSave(changes) {
+    const cloned_changes = {...changes}
+
+    // Insert new blocks
+    const insrt_blocks = blocks.concat(changes['new_block'])
+
+    // Delete the blocks
+    // -- duplicate deletes
+    const deletes_dict = {}
+    for (let del_id of cloned_changes['deletes']) {
+      deletes_dict[del_id] = true
+    }
+    const del_blocks = insrt_blocks.filter(({id}) => !deletes_dict[id])
+
+    // Update
+    const updt_blocks = del_blocks.map(blk => {
+      // if the block has an update
+      if (blk.id in changes['updates']) {
+        return {
+          ...blk,
+          content: changes['updates'][blk.id]
+        }
+      }
+      return blk
+    })
+
+    // Update
+    const pos_blocks = updt_blocks.map(blk => {
+      // if the block has an update
+      if (blk.id in changes['positions']) {
+        return {
+          ...blk,
+          position: changes['positions'][blk.id]
+        }
+      }
+      return blk
+    })
+
+    const order_blocks = orderBlocks(pos_blocks)
+
+    setBlocks(order_blocks)
+  }
 
   async function manualSave() {
     if (Object.keys(changes['updates']).length || Object.keys(changes['positions']).length || changes['deletes'].length || changes['new_block'].length) {
@@ -82,6 +130,8 @@ export const Content = () => {
         }
       }
 
+      console.log("CLONE: ", changed_cloned)
+
       const {error} = await supabase.rpc("update_blocks", 
         {
           updates: changed_cloned['updates'],
@@ -94,6 +144,15 @@ export const Content = () => {
       if (error) {
         setError(error)
         return
+      } else {
+        console.log("SHARED ID: ", sharedId)
+        if (sharedId) {
+          supabase.channel(`document:${sharedId}`).send({
+            type: "broadcast",
+            event: 'changes',
+            payload: {...changed_cloned}
+          })
+        }
       }
       setSaved(new Date())
       setChanges(defaultChanges)
@@ -217,6 +276,7 @@ export const Content = () => {
   return (
     <div className='h-full flex flex-col font-inter gap-1 justify-top items-center overflow-y-scroll'>
       <div className='w-full bg-[#191919] py-2 px-4 flex flex-wrap items-center justify-end gap-4 text-sm'>
+        <p className='text-[#e7e7e7] mr-2'>{sharedId && `Share id: ${sharedId}`}</p>
         <p className='text-[#e7e7e7]'>Last saved: {saved.getHours() + ":" + saved.getMinutes() + " " + saved.getDate()+1 + "/" + saved.getMonth() + "/" + saved.getFullYear()}</p>
         {/* Save button */}
         <button onClick={manualSave} className='hover:cursor-pointer hover:shadow-lg'>💾</button>
@@ -233,6 +293,7 @@ export const Content = () => {
             setChanges={setChanges} 
             setError={setError} 
             setLoading={setLoading} 
+            doc_id={params.doc_id}
           />
         </DndContext>
       </div>

@@ -119,3 +119,12 @@ Websocket:
 - useEffect to register
 - On change send the change over
 - ...
+
+
+
+
+on Unshare: 
+- Send to not shared page
+
+on Save:
+- send payload

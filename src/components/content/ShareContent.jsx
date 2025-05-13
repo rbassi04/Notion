@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import supabase from '../../supabaseClient'
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { closestCorners, DndContext } from '@dnd-kit/core';
 import { BlocksHolder } from './blocks/BlocksHolder';
 import { arrayMove } from '@dnd-kit/sortable';
-import getMinPositionDistance from './util';
+import getMinPositionDistance, { orderBlocks } from './util';
 
 
 
@@ -23,39 +23,94 @@ export const ShareContent = () => {
   const [blocks, setBlocks] = useState([])
   const [loading, setLoading] = useState(true)
   const [saved, setSaved] = useState(new Date())
-
+  const [docId, setDocId] = useState(null)
 
   // (key, value) => (block_id, new content)
   const [changes, setChanges] = useState(defaultChanges)
 
-  // useEffect(() => {
-  //   function messageRecieved(payload) {
-  //     console.log(payload)
-  //   }
 
-  //   if (blocks.length && params.shared_id) {
-  //     const shared_id = params.shared_id
+  const navigate = useNavigate()
 
-  //     if (shared_id) {
-  //       const myChannel = supabase.channel(`document:${shared_id}`)
-  //       myChannel
-  //         .on(
-  //           'broadcast',
-  //           {event: 'shout'},
-  //           messageRecieved
-  //         )
-  //         .subscribe()
-  //     }
-  //     else {
-  //       const myChannel = supabase.channel(`document:${shared_id}`)
-  //       myChannel
-  //         .unsubscribe()
-  //     }
-  //   }
 
-  //   // Unsubscribe from channel
-  //   return () => supabase.channel(`document:${params.shared_id}`).unsubscribe()
-  // }, [params.shared_id])
+  useEffect(() => {
+    function messageRecieved({payload}) {
+      broadcastSave(payload)
+    }
+
+    if (blocks.length && params.doc_id) {
+      const shared_id = params.doc_id
+
+      if (shared_id) {
+        const myChannel = supabase.channel(`document:${shared_id}`)
+        myChannel
+          .on(
+            'broadcast',
+            {event: 'changes'},
+            messageRecieved
+          )
+          .subscribe()
+
+        myChannel
+          .on(
+            'broadcast',
+            {event: 'share'},
+            () => navigate(0)
+          )
+      }
+      else {
+        const myChannel = supabase.channel(`document:${shared_id}`)
+        myChannel
+          .unsubscribe()
+      }
+    }
+
+    // Unsubscribe from channel
+    return () => supabase.channel(`document:${params.shared_id}`).unsubscribe()
+  }, [blocks])
+
+  function broadcastSave(changes) {
+    const cloned_changes = {...changes}
+
+    // Insert new blocks
+    const insrt_blocks = blocks.concat(changes['new_block'])
+
+    // Delete the blocks
+    // -- duplicate deletes
+    const deletes_dict = {}
+    for (let del_id of cloned_changes['deletes']) {
+      deletes_dict[del_id] = true
+    }
+    const del_blocks = insrt_blocks.filter(({id}) => !deletes_dict[id])
+
+    // Update
+    const updt_blocks = del_blocks.map(blk => {
+      // if the block has an update
+      if (blk.id in changes['updates']) {
+        return {
+          ...blk,
+          content: changes['updates'][blk.id]
+        }
+      }
+      return blk
+    })
+
+    // Update
+    const pos_blocks = updt_blocks.map(blk => {
+      // if the block has an update
+      if (blk.id in changes['positions']) {
+        return {
+          ...blk,
+          position: changes['positions'][blk.id]
+        }
+      }
+      return blk
+    })
+
+    const order_blocks = orderBlocks(pos_blocks)
+
+    setBlocks(order_blocks)
+  }
+
 
   async function manualSave() {
     if (Object.keys(changes['updates']).length || Object.keys(changes['positions']).length || changes['deletes'].length || changes['new_block'].length) {
@@ -82,6 +137,9 @@ export const ShareContent = () => {
         }
       }
 
+      // update doc_id:
+
+
       const {error} = await supabase.rpc("update_blocks", 
         {
           updates: changed_cloned['updates'],
@@ -94,6 +152,12 @@ export const ShareContent = () => {
       if (error) {
         setError(error)
         return
+      } else {
+        supabase.channel(`document:${params.doc_id}`).send({
+          type: "broadcast",
+          event: 'changes',
+          payload: {...changed_cloned}
+        })
       }
       setSaved(new Date())
       setChanges(defaultChanges)
@@ -168,20 +232,19 @@ export const ShareContent = () => {
     })
   }
 
-
   useEffect(() => {
     const getBlocks = async (shared_id) => {
-      console.log("shared_id: ", shared_id)
       // Get blocks
       setError()
       setLoading(true)
       const { data: docs, error: docError } = await supabase
-      .from("documents")
-      .select("id")
-      .eq("shared_id", shared_id);
-    
+        .from("documents")
+        .select("id")
+        .eq("shared_id", shared_id);
+      
     if (docs) {
         const docIds = docs.map(d => d.id);
+        setDocId(docIds[0])
       
         const { data: blocks, error: blockError } = await supabase
           .from("blocks")
@@ -190,7 +253,6 @@ export const ShareContent = () => {
           .order("position");
       
         // now blocks will be from only documents with matching shared_id
-        console.log("blocks: ", blocks)
         if (blockError) {
           setError(error)
         } else {
@@ -203,6 +265,7 @@ export const ShareContent = () => {
         }
       } 
       if (docError) {
+        setDocId(null)
         setError(docError)
       }
       setLoading(false)
@@ -249,9 +312,10 @@ export const ShareContent = () => {
             blocks={blocks}
             setBlocks={setBlocks} 
             changes={changes}
-            setChanges={setChanges} 
-            setError={setError} 
-            setLoading={setLoading} 
+            setChanges={setChanges}
+            setError={setError}
+            setLoading={setLoading}
+            doc_id={docId}
           />
         </DndContext>
       </div>
