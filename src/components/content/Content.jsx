@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import supabase from '../../supabaseClient'
-import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import BlockRenderer from './blocks/BlockRenderer';
-import { closestCorners, DndContext, useDroppable } from '@dnd-kit/core';
+import { useOutletContext, useParams } from 'react-router-dom';
+import { closestCorners, DndContext } from '@dnd-kit/core';
 import { BlocksHolder } from './blocks/BlocksHolder';
 import { arrayMove } from '@dnd-kit/sortable';
 import getMinPositionDistance, { orderBlocks } from './util';
+import { debounce } from 'lodash';
 
-
+const DEBOUNCE_MS = 500
 
 export const Content = () => {
   // Defaults
@@ -17,6 +17,8 @@ export const Content = () => {
     positions: {},
     new_block: []
   }
+
+  const [id] = useOutletContext()
 
   // States
   const params = useParams();
@@ -31,11 +33,12 @@ export const Content = () => {
   const [changes, setChanges] = useState(defaultChanges)
 
   useEffect(() => {
-    function messageRecieved({payload}) {
-      broadcastSave(payload)
+    function messageRecieved(payload) {
+      if (id === payload.payload.id) return
+      broadcastSave(payload.payload)
     }
 
-    if (blocks.length && blocks[0]['documents']['shared_id']) {
+    if (blocks.length && blocks[0]['documents'] && blocks[0]['documents']['shared_id']) {
       const shared_id = blocks[0]['documents']['shared_id']
       setSharedId(shared_id)
 
@@ -56,53 +59,76 @@ export const Content = () => {
         
         setSharedId(false)
       }
+
+      // const interval = setInterval(() => manualSave(), 1000)
+
       // Unsubscribe from channel
-      return () => supabase.channel(`document:${shared_id}`).unsubscribe()
-    }
-  }, [blocks])
-
-
-  function broadcastSave(changes) {
-    const cloned_changes = {...changes}
-
-    // Insert new blocks
-    const insrt_blocks = blocks.concat(changes['new_block'])
-
-    // Delete the blocks
-    // -- duplicate deletes
-    const deletes_dict = {}
-    for (let del_id of cloned_changes['deletes']) {
-      deletes_dict[del_id] = true
-    }
-    const del_blocks = insrt_blocks.filter(({id}) => !deletes_dict[id])
-
-    // Update
-    const updt_blocks = del_blocks.map(blk => {
-      // if the block has an update
-      if (blk.id in changes['updates']) {
-        return {
-          ...blk,
-          content: changes['updates'][blk.id]
-        }
+      return () => {
+        supabase.channel(`document:${shared_id}`).unsubscribe()
+        // clearInterval(interval)
       }
-      return blk
-    })
+    }
+  }, [blocks, setChanges])
 
-    // Update
-    const pos_blocks = updt_blocks.map(blk => {
-      // if the block has an update
-      if (blk.id in changes['positions']) {
-        return {
-          ...blk,
-          position: changes['positions'][blk.id]
-        }
+
+  // Define this outside the component to avoid redefining on every render
+  const debouncedSave = debounce((saveFn) => {
+    saveFn();
+  }, DEBOUNCE_MS);
+
+  useEffect(() => {
+    if (changes.toBroadcast) {
+      debouncedSave(manualSave);
+    }
+
+    // Cleanup to cancel debounce on unmount
+    return () => debouncedSave.cancel();
+  }, [changes.toBroadcast]);
+
+  const broadcastSave = (changes) => {
+    if (!changes) return
+
+    setBlocks(blks => {
+      const cloned_changes = {...changes}
+
+      // Insert new blocks
+      const insrt_blocks = blks.concat(changes['new_block'])
+
+      // Delete the blocks
+      // -- duplicate deletes
+      const deletes_dict = {}
+      for (let del_id of cloned_changes['deletes']) {
+        deletes_dict[del_id] = true
       }
-      return blk
+      const del_blocks = insrt_blocks.filter(({id}) => !deletes_dict[id])
+
+      // Update
+      const updt_blocks = del_blocks.map(blk => {
+        // if the block has an update
+        if (blk.id in changes['updates']) {
+          return {
+            ...blk,
+            content: changes['updates'][blk.id],
+            flip: !blk.flip
+          }
+        }
+        return blk
+      })
+
+      // Update
+      const pos_blocks = updt_blocks.map(blk => {
+        // if the block has an update
+        if (blk.id in changes['positions']) {
+          return {
+            ...blk,
+            position: changes['positions'][blk.id]
+          }
+        }
+        return blk
+      })
+
+      return orderBlocks(pos_blocks)
     })
-
-    const order_blocks = orderBlocks(pos_blocks)
-
-    setBlocks(order_blocks)
   }
 
   async function manualSave() {
@@ -130,8 +156,6 @@ export const Content = () => {
         }
       }
 
-      console.log("CLONE: ", changed_cloned)
-
       const {error} = await supabase.rpc("update_blocks", 
         {
           updates: changed_cloned['updates'],
@@ -145,37 +169,22 @@ export const Content = () => {
         setError(error)
         return
       } else {
-        console.log("SHARED ID: ", sharedId)
         if (sharedId) {
           supabase.channel(`document:${sharedId}`).send({
             type: "broadcast",
             event: 'changes',
-            payload: {...changed_cloned}
+            payload: {...changed_cloned, id}
           })
         }
       }
       setSaved(new Date())
-      setChanges(defaultChanges)
     }
-  }
-
-  async function revertToOldSave() {
-    // 
-    setLoading(true)
-    setChanges(defaultChanges)
-    setError()
-
-
-
-    const {data, error} = await supabase.from("blocks").select("*").eq("doc_id", params.doc_id).order("position")
-
-    if (error) {
-      setError(error)
-      setLoading(false)
-    } else {
-      setBlocks(data)
-      setLoading(false)
-    }
+    setChanges({
+      deletes: [], 
+      updates: {}, 
+      positions: {},
+      new_block: []
+    })
   }
 
   function handleDragEnd(event) {
@@ -199,34 +208,35 @@ export const Content = () => {
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
       } else if (newPos === blocks.length-1) {
         const prevPosition = blocks[newPos].position
         const nextPosition = blocks[newPos].position+100
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
       } else if (newPos > originalPos) {
         const prevPosition = blocks[newPos].position
         const nextPosition = blocks[newPos+1].position
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
       } else if (newPos < originalPos) {
         const prevPosition = blocks[newPos-1].position
         const nextPosition = blocks[newPos].position
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
       }
 
       return indexOrderedArray
     })
   }
 
+  console.log(changes.updates)
 
   useEffect(() => {
     const getBlocks = async (doc_id) => {

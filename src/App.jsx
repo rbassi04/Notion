@@ -82,7 +82,7 @@ export default function App() {
 
         {/* Document Column */}
         <div className='w-full'>
-          <Outlet  />
+          <Outlet context={[session.user.id]} />
         </div>
       </div>
     </div>

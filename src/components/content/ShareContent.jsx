@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import supabase from '../../supabaseClient'
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { closestCorners, DndContext } from '@dnd-kit/core';
 import { BlocksHolder } from './blocks/BlocksHolder';
 import { arrayMove } from '@dnd-kit/sortable';
 import getMinPositionDistance, { orderBlocks } from './util';
+import { debounce } from "lodash"; // or lodash-es
 
+const DEBOUNCE_MS = 1000; // 1 second
 
 
 export const ShareContent = () => {
@@ -17,6 +19,8 @@ export const ShareContent = () => {
     new_block: []
   }
 
+  const [id] = useOutletContext()
+
   // States
   const params = useParams();
   const [error, setError] = useState()
@@ -27,14 +31,18 @@ export const ShareContent = () => {
 
   // (key, value) => (block_id, new content)
   const [changes, setChanges] = useState(defaultChanges)
-
+  const latestChangesRef = useRef(changes);
 
   const navigate = useNavigate()
 
+  useEffect(() => {
+    latestChangesRef.current = changes;
+  }, [changes]);
 
   useEffect(() => {
-    function messageRecieved({payload}) {
-      broadcastSave(payload)
+    function messageRecieved(payload) {
+      if (payload.payload.id === id) return
+      broadcastSave(payload.payload)
     }
 
     if (blocks.length && params.doc_id) {
@@ -64,51 +72,72 @@ export const ShareContent = () => {
       }
     }
 
+    // const interval = setInterval(() => manualSave(), 10000)
+
     // Unsubscribe from channel
-    return () => supabase.channel(`document:${params.shared_id}`).unsubscribe()
+    return () => {
+      supabase.channel(`document:${params.shared_id}`).unsubscribe()
+      // clearInterval(interval)
+    }
   }, [blocks])
 
-  function broadcastSave(changes) {
-    const cloned_changes = {...changes}
+  // Define this outside the component to avoid redefining on every render
+  const debouncedSave = debounce((saveFn) => {
+    saveFn();
+  }, DEBOUNCE_MS);
 
-    // Insert new blocks
-    const insrt_blocks = blocks.concat(changes['new_block'])
-
-    // Delete the blocks
-    // -- duplicate deletes
-    const deletes_dict = {}
-    for (let del_id of cloned_changes['deletes']) {
-      deletes_dict[del_id] = true
+  useEffect(() => {
+    if (changes.toBroadcast) {
+      debouncedSave(manualSave);
     }
-    const del_blocks = insrt_blocks.filter(({id}) => !deletes_dict[id])
 
-    // Update
-    const updt_blocks = del_blocks.map(blk => {
-      // if the block has an update
-      if (blk.id in changes['updates']) {
-        return {
-          ...blk,
-          content: changes['updates'][blk.id]
-        }
+    // Cleanup to cancel debounce on unmount
+    return () => debouncedSave.cancel();
+  }, [changes.toBroadcast]);
+
+  function broadcastSave(changes) {
+    if (!changes) return
+
+    setBlocks(blks => {
+      const cloned_changes = {...changes}
+
+      // Insert new blocks
+      const insrt_blocks = blks.concat(changes['new_block'])
+
+      // Delete the blocks
+      // -- duplicate deletes
+      const deletes_dict = {}
+      for (let del_id of cloned_changes['deletes']) {
+        deletes_dict[del_id] = true
       }
-      return blk
-    })
+      const del_blocks = insrt_blocks.filter(({id}) => !deletes_dict[id])
 
-    // Update
-    const pos_blocks = updt_blocks.map(blk => {
-      // if the block has an update
-      if (blk.id in changes['positions']) {
-        return {
-          ...blk,
-          position: changes['positions'][blk.id]
+      // Update
+      const updt_blocks = del_blocks.map(blk => {
+        // if the block has an update
+        if (blk.id in changes['updates']) {
+          return {
+            ...blk,
+            content: changes['updates'][blk.id]
+          }
         }
-      }
-      return blk
+        return blk
+      })
+
+      // Update
+      const pos_blocks = updt_blocks.map(blk => {
+        // if the block has an update
+        if (blk.id in changes['positions']) {
+          return {
+            ...blk,
+            position: changes['positions'][blk.id]
+          }
+        }
+        return blk
+      })
+
+      return orderBlocks(pos_blocks)
     })
-
-    const order_blocks = orderBlocks(pos_blocks)
-
-    setBlocks(order_blocks)
   }
 
 
@@ -156,31 +185,12 @@ export const ShareContent = () => {
         supabase.channel(`document:${params.doc_id}`).send({
           type: "broadcast",
           event: 'changes',
-          payload: {...changed_cloned}
+          payload: {...changed_cloned, id}
         })
       }
       setSaved(new Date())
-      setChanges(defaultChanges)
     }
-  }
-
-  async function revertToOldSave() {
-    // 
-    setLoading(true)
     setChanges(defaultChanges)
-    setError()
-
-
-
-    const {data, error} = await supabase.from("blocks").select("*").eq("shared_id", params.doc_id).order("position")
-
-    if (error) {
-      setError(error)
-      setLoading(false)
-    } else {
-      setBlocks(data)
-      setLoading(false)
-    }
   }
 
   function handleDragEnd(event) {
@@ -204,28 +214,28 @@ export const ShareContent = () => {
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
       } else if (newPos === blocks.length-1) {
         const prevPosition = blocks[newPos].position
         const nextPosition = blocks[newPos].position+100
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
       } else if (newPos > originalPos) {
         const prevPosition = blocks[newPos].position
         const nextPosition = blocks[newPos+1].position
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
       } else if (newPos < originalPos) {
         const prevPosition = blocks[newPos-1].position
         const nextPosition = blocks[newPos].position
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
       }
 
       return indexOrderedArray
@@ -289,8 +299,6 @@ export const ShareContent = () => {
           <br />
           {error.message}
         </h1>
-        {/* <button onClick={manualSave} className=''>RESAVE</button> */}
-        <button onClick={revertToOldSave} className='px-3 py-1 outline-1 bg-slate-400 hover:cursor-pointer'>REVERT TO OLD SAVE</button>
       </div>
     )
   }

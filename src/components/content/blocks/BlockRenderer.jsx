@@ -26,6 +26,7 @@ export default function BlockRenderer({ idx, block, blocks, setBlocks, changes, 
     // Update changes
     setChanges(changes => {
       changes["deletes"].push(id)
+      changes.toBroadcast = true
       return changes
     })
 
@@ -66,6 +67,8 @@ export default function BlockRenderer({ idx, block, blocks, setBlocks, changes, 
 
     changed_cloned['new_block'].push(newBlock)
     changed_cloned['positions'][block.id]
+    changed_cloned.toBroadcast = true
+    // currChanges.toBroadcast = true
 
     // No need to handle precision of position, it will be handled before save
     setChanges(changed_cloned)

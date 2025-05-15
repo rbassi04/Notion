@@ -11,13 +11,22 @@ export const Quote = ({block, setChanges}) => {
       textarea.style.height = `${textarea.scrollHeight}px`;
     }
   }, [quote]);
+  
+  useEffect(() => {
+    setQuote(block.content)
+  }, [block.content])
 
   function changeContent(e) {
     setQuote(e.target.value)
-    setChanges(currChanges => {
-      currChanges['updates'][block.id] = e.target.value
-      return currChanges
-    })
+    setChanges(currChanges => ({
+        ...currChanges, 
+        updates: {
+          ...currChanges['updates'],
+          [block.id]: e.target.value
+        },
+        toBroadcast: true
+      })
+    )
   }
 
   return (

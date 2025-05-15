@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react'
 import BlockRenderer from './BlockRenderer'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { v4 as uuidv4 } from 'uuid';
-import { useParams } from 'react-router-dom';
 import { blockUtil } from './blockUtil';
 
 
@@ -37,12 +36,12 @@ export const BlocksHolder = ({blocks, setBlocks, changes, setChanges, setError, 
     blocks.push(newBlock)
 
     changed_cloned['new_block'].push(newBlock)
+    changed_cloned.toBroadcast = true
 
     // No need to handle precision of position, it will be handled before save
     setChanges(changed_cloned)
   }
 
-  
   return (
     <div className='w-full flex flex-col gap-1 items-center'>
       <SortableContext 

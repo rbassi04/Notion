@@ -12,12 +12,21 @@ export const BlockSubHeading = ({block, setChanges}) => {
     }
   }, [heading]);
 
+  useEffect(() => {
+    setHeading(block.content)
+  }, [block.content])
+    
   function changeContent(e) {
     setHeading(e.target.value)
-    setChanges(currChanges => {
-      currChanges['updates'][block.id] = e.target.value
-      return currChanges
-    })
+    setChanges(currChanges => ({
+        ...currChanges, 
+        updates: {
+          ...currChanges['updates'],
+          [block.id]: e.target.value
+        },
+        toBroadcast: true
+      })
+    )
   }
 
   return (

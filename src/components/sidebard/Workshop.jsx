@@ -29,7 +29,7 @@ export const Workshop = ({workshop, setWorkshop, workshop_id, admin}) => {
   }, [])
   
   async function newDocument(renameElem) {
-      const id = uuidv4()
+    const id = uuidv4()
 
     // In workshop
     setWorkshop(workshop => {

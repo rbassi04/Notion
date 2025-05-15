@@ -12,12 +12,21 @@ export const BlockText = ({block, setChanges}) => {
     }
   }, [text]);
 
+  useEffect(() => {
+    setText(block.content)
+  }, [block.content])
+
   function changeContent(e) {
     setText(e.target.value)
-    setChanges(currChanges => {
-      currChanges['updates'][block.id] = e.target.value
-      return currChanges
-    })
+    setChanges(currChanges => ({
+        ...currChanges, 
+        updates: {
+          ...currChanges['updates'],
+          [block.id]: e.target.value
+        },
+        toBroadcast: true
+      })
+    )
   }
 
   return (
