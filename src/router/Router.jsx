@@ -9,12 +9,13 @@ const router = createBrowserRouter([
     path: "/",
     element: <App />,
     children: [
-      { index: "/", element: <Default /> },
-      { path: "/share/:doc_id", element: <ShareContent /> },
-      { path: "/document/:doc_id", element: <Content /> },
+      { index: true, element: <Default /> },
+      { path: "share/:doc_id", element: <ShareContent /> },
+      { path: "document/:doc_id", element: <Content /> },
     ],
-  }
+  },
 ]);
+
 
 export default router;
 
