@@ -41,6 +41,7 @@ export const ShareContent = () => {
 
   useEffect(() => {
     function messageRecieved(payload) {
+      console.log("PAYLOAD: ", payload.payload)
       if (payload.payload.id === id) return
       broadcastSave(payload.payload)
     }
@@ -86,14 +87,51 @@ export const ShareContent = () => {
     saveFn();
   }, DEBOUNCE_MS);
 
+  console.log(changes)
   useEffect(() => {
+    console.log("useeffect changes: ", changes)
     if (changes.toBroadcast) {
-      debouncedSave(manualSave);
+      debouncedSave(broadcastChanges);
     }
 
     // Cleanup to cancel debounce on unmount
     return () => debouncedSave.cancel();
-  }, [changes.toBroadcast]);
+  }, [changes, debouncedSave]);
+
+  function broadcastChanges() {
+    if (Object.keys(changes['updates']).length || Object.keys(changes['positions']).length || changes['deletes'].length || changes['new_block'].length) {
+      // Prepare payload
+      for (let delete_id of changes['deletes']) {
+        delete changes['updates'][delete_id]
+      }
+
+      for (let delete_id of changes['deletes']) {
+        delete changes['positions'][delete_id]
+      }
+
+      const min = getMinPositionDistance(blocks)
+
+      const changed_cloned = {...changes}
+      
+      // Check if need to recalibrate positions
+      if (min < 0.000001) {
+        let index = 100
+        for (let block of blocks) {
+          // Upadte positions
+          changed_cloned['positions'][block.id] = index*100
+          index += 1
+        }
+      }
+
+      if (params.doc_id) {
+        supabase.channel(`document:${params.doc_id}`).send({
+          type: "broadcast",
+          event: 'changes',
+          payload: {...changed_cloned, id}
+        })
+      }
+    }
+  }
 
   function broadcastSave(changes) {
     if (!changes) return
@@ -140,7 +178,6 @@ export const ShareContent = () => {
     })
   }
 
-
   async function manualSave() {
     if (Object.keys(changes['updates']).length || Object.keys(changes['positions']).length || changes['deletes'].length || changes['new_block'].length) {
       // Prepare payload
@@ -182,11 +219,11 @@ export const ShareContent = () => {
         setError(error)
         return
       } else {
-        supabase.channel(`document:${params.doc_id}`).send({
-          type: "broadcast",
-          event: 'changes',
-          payload: {...changed_cloned, id}
-        })
+        // supabase.channel(`document:${params.doc_id}`).send({
+        //   type: "broadcast",
+        //   event: 'changes',
+        //   payload: {...changed_cloned, id}
+        // })
       }
       setSaved(new Date())
     }

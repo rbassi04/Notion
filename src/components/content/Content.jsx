@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import supabase from '../../supabaseClient'
 import { useOutletContext, useParams } from 'react-router-dom';
 import { closestCorners, DndContext } from '@dnd-kit/core';
@@ -31,9 +31,11 @@ export const Content = () => {
 
   // (key, value) => (block_id, new content)
   const [changes, setChanges] = useState(defaultChanges)
+  const refChanges = useRef(defaultChanges)
 
   useEffect(() => {
     function messageRecieved(payload) {
+      console.log("PAYLOAD: ", payload.payload)
       if (id === payload.payload.id) return
       broadcastSave(payload.payload)
     }
@@ -77,13 +79,49 @@ export const Content = () => {
   }, DEBOUNCE_MS);
 
   useEffect(() => {
+    console.log("useeffect changes: ", changes)
     if (changes.toBroadcast) {
-      debouncedSave(manualSave);
+      debouncedSave(broadcastChanges);
     }
 
     // Cleanup to cancel debounce on unmount
     return () => debouncedSave.cancel();
-  }, [changes.toBroadcast]);
+  }, [changes, debouncedSave]);
+
+  function broadcastChanges() {
+    if (Object.keys(changes['updates']).length || Object.keys(changes['positions']).length || changes['deletes'].length || changes['new_block'].length) {
+      // Prepare payload
+      for (let delete_id of changes['deletes']) {
+        delete changes['updates'][delete_id]
+      }
+
+      for (let delete_id of changes['deletes']) {
+        delete changes['positions'][delete_id]
+      }
+
+      const min = getMinPositionDistance(blocks)
+
+      const changed_cloned = {...changes}
+      
+      // Check if need to recalibrate positions
+      if (min < 0.000001) {
+        let index = 100
+        for (let block of blocks) {
+          // Upadte positions
+          changed_cloned['positions'][block.id] = index*100
+          index += 1
+        }
+      }
+
+      if (sharedId) {
+        supabase.channel(`document:${sharedId}`).send({
+          type: "broadcast",
+          event: 'changes',
+          payload: {...changed_cloned, id}
+        })
+      }
+    }
+  }
 
   const broadcastSave = (changes) => {
     if (!changes) return
@@ -132,6 +170,7 @@ export const Content = () => {
   }
 
   async function manualSave() {
+    setChanges(defaultChanges)
     if (Object.keys(changes['updates']).length || Object.keys(changes['positions']).length || changes['deletes'].length || changes['new_block'].length) {
       // Prepare payload
       for (let delete_id of changes['deletes']) {
@@ -169,22 +208,16 @@ export const Content = () => {
         setError(error)
         return
       } else {
-        if (sharedId) {
-          supabase.channel(`document:${sharedId}`).send({
-            type: "broadcast",
-            event: 'changes',
-            payload: {...changed_cloned, id}
-          })
-        }
+        // if (sharedId) {
+        //   supabase.channel(`document:${sharedId}`).send({
+        //     type: "broadcast",
+        //     event: 'changes',
+        //     payload: {...changed_cloned, id}
+        //   })
+        // }
       }
       setSaved(new Date())
     }
-    setChanges({
-      deletes: [], 
-      updates: {}, 
-      positions: {},
-      new_block: []
-    })
   }
 
   function handleDragEnd(event) {
@@ -311,3 +344,13 @@ export const Content = () => {
   )
 }
 
+
+
+const refChangesToStateChanges = (refChanges) => {
+  /*
+    refChanges[deletes] => array of ids
+    refChanges[updates] => array of refs
+    refChanges[new_block] => array of objects
+    refChanges[positions] => array of ids
+  */
+}
