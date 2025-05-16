@@ -29,49 +29,44 @@ export const ShareContent = () => {
   const [saved, setSaved] = useState(new Date())
   const [docId, setDocId] = useState(null)
 
+  const [broadcastAux, setBroadcastAux] = useState(0)
   // (key, value) => (block_id, new content)
-  const [changes, setChanges] = useState(defaultChanges)
-  const latestChangesRef = useRef(changes);
+  const refChanges = useRef(defaultChanges);
 
   const navigate = useNavigate()
 
   useEffect(() => {
-    latestChangesRef.current = changes;
-  }, [changes]);
-
-  useEffect(() => {
     function messageRecieved(payload) {
-      console.log("PAYLOAD: ", payload.payload)
       if (payload.payload.id === id) return
-      broadcastSave(payload.payload)
-    }
-
-    if (blocks.length && params.doc_id) {
-      const shared_id = params.doc_id
-
-      if (shared_id) {
-        const myChannel = supabase.channel(`document:${shared_id}`)
-        myChannel
-          .on(
-            'broadcast',
-            {event: 'changes'},
-            messageRecieved
-          )
-          .subscribe()
-
-        myChannel
-          .on(
-            'broadcast',
-            {event: 'share'},
-            () => navigate(0)
-          )
+        broadcastSave(payload.payload)
       }
-      else {
-        const myChannel = supabase.channel(`document:${shared_id}`)
-        myChannel
-          .unsubscribe()
+
+      if (blocks.length && params.doc_id) {
+        const shared_id = params.doc_id
+
+        if (shared_id) {
+          const myChannel = supabase.channel(`document:${shared_id}`)
+          myChannel
+            .on(
+              'broadcast',
+              {event: 'changes'},
+              messageRecieved
+            )
+            .subscribe()
+
+          myChannel
+            .on(
+              'broadcast',
+              {event: 'share'},
+              () => navigate(0)
+            )
+        }
+        else {
+          const myChannel = supabase.channel(`document:${shared_id}`)
+          myChannel
+            .unsubscribe()
+        }
       }
-    }
 
     // const interval = setInterval(() => manualSave(), 10000)
 
@@ -87,18 +82,17 @@ export const ShareContent = () => {
     saveFn();
   }, DEBOUNCE_MS);
 
-  console.log(changes)
   useEffect(() => {
-    console.log("useeffect changes: ", changes)
-    if (changes.toBroadcast) {
+    if (refChanges.current.toBroadcast) {
       debouncedSave(broadcastChanges);
     }
 
     // Cleanup to cancel debounce on unmount
     return () => debouncedSave.cancel();
-  }, [changes, debouncedSave]);
+  }, [refChanges.current, broadcastAux, debouncedSave]);
 
   function broadcastChanges() {
+    const changes = refChanges.current
     if (Object.keys(changes['updates']).length || Object.keys(changes['positions']).length || changes['deletes'].length || changes['new_block'].length) {
       // Prepare payload
       for (let delete_id of changes['deletes']) {
@@ -179,6 +173,7 @@ export const ShareContent = () => {
   }
 
   async function manualSave() {
+    const changes = refChanges.current
     if (Object.keys(changes['updates']).length || Object.keys(changes['positions']).length || changes['deletes'].length || changes['new_block'].length) {
       // Prepare payload
       for (let delete_id of changes['deletes']) {
@@ -227,7 +222,7 @@ export const ShareContent = () => {
       }
       setSaved(new Date())
     }
-    setChanges(defaultChanges)
+    refChanges.current = defaultChanges
   }
 
   function handleDragEnd(event) {
@@ -251,28 +246,29 @@ export const ShareContent = () => {
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        
+        refChanges.current = ({...refChanges.current, toBroadcast: true, positions: {...refChanges.current.positions, [indexOrderedArray[newPos].id]: newPosition}})
       } else if (newPos === blocks.length-1) {
         const prevPosition = blocks[newPos].position
         const nextPosition = blocks[newPos].position+100
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        refChanges.current = ({...refChanges.current, toBroadcast: true, positions: {...refChanges.current.positions, [indexOrderedArray[newPos].id]: newPosition}})
       } else if (newPos > originalPos) {
         const prevPosition = blocks[newPos].position
         const nextPosition = blocks[newPos+1].position
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        refChanges.current = ({...refChanges.current, toBroadcast: true, positions: {...refChanges.current.positions, [indexOrderedArray[newPos].id]: newPosition}})
       } else if (newPos < originalPos) {
         const prevPosition = blocks[newPos-1].position
         const nextPosition = blocks[newPos].position
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        refChanges.current = ({...refChanges.current, toBroadcast: true, positions: {...refChanges.current.positions, [indexOrderedArray[newPos].id]: newPosition}})
       }
 
       return indexOrderedArray
@@ -318,7 +314,7 @@ export const ShareContent = () => {
       setLoading(false)
     }
   
-    setChanges(defaultChanges)
+    refChanges.current = defaultChanges
     getBlocks(params.doc_id)
   }, [params.doc_id])
 
@@ -356,8 +352,8 @@ export const ShareContent = () => {
           <BlocksHolder
             blocks={blocks}
             setBlocks={setBlocks} 
-            changes={changes}
-            setChanges={setChanges}
+            refChanges={refChanges}
+            setBroadcastAux={setBroadcastAux}
             setError={setError}
             setLoading={setLoading}
             doc_id={docId}

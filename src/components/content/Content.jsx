@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import supabase from '../../supabaseClient'
 import { useOutletContext, useParams } from 'react-router-dom';
 import { closestCorners, DndContext } from '@dnd-kit/core';
@@ -29,13 +29,13 @@ export const Content = () => {
   const [sharedId, setSharedId] = useState(null)
 
 
+  const [broadcastAux, setBroadcastAux] = useState(0)
+
   // (key, value) => (block_id, new content)
-  const [changes, setChanges] = useState(defaultChanges)
   const refChanges = useRef(defaultChanges)
 
   useEffect(() => {
     function messageRecieved(payload) {
-      console.log("PAYLOAD: ", payload.payload)
       if (id === payload.payload.id) return
       broadcastSave(payload.payload)
     }
@@ -70,7 +70,7 @@ export const Content = () => {
         // clearInterval(interval)
       }
     }
-  }, [blocks, setChanges])
+  }, [blocks])
 
 
   // Define this outside the component to avoid redefining on every render
@@ -79,16 +79,16 @@ export const Content = () => {
   }, DEBOUNCE_MS);
 
   useEffect(() => {
-    console.log("useeffect changes: ", changes)
-    if (changes.toBroadcast) {
-      debouncedSave(broadcastChanges);
+    if (refChanges.current.toBroadcast) {
+      debouncedSave(manualSave);
     }
 
     // Cleanup to cancel debounce on unmount
     return () => debouncedSave.cancel();
-  }, [changes, debouncedSave]);
+  }, [refChanges.current, broadcastAux, debouncedSave]);
 
   function broadcastChanges() {
+    const changes = refChanges.current
     if (Object.keys(changes['updates']).length || Object.keys(changes['positions']).length || changes['deletes'].length || changes['new_block'].length) {
       // Prepare payload
       for (let delete_id of changes['deletes']) {
@@ -170,20 +170,20 @@ export const Content = () => {
   }
 
   async function manualSave() {
-    setChanges(defaultChanges)
-    if (Object.keys(changes['updates']).length || Object.keys(changes['positions']).length || changes['deletes'].length || changes['new_block'].length) {
+    const changed_cloned = {...refChanges.current}
+    refChanges.current = defaultChanges
+    if (Object.keys(changed_cloned['updates']).length || Object.keys(changed_cloned['positions']).length || changed_cloned['deletes'].length || changed_cloned['new_block'].length) {
       // Prepare payload
-      for (let delete_id of changes['deletes']) {
-        delete changes['updates'][delete_id]
+      for (let delete_id of changed_cloned['deletes']) {
+        delete changed_cloned['updates'][delete_id]
       }
 
-      for (let delete_id of changes['deletes']) {
-        delete changes['positions'][delete_id]
+      for (let delete_id of changed_cloned['deletes']) {
+        delete changed_cloned['positions'][delete_id]
       }
 
       const min = getMinPositionDistance(blocks)
 
-      const changed_cloned = {...changes}
       
       // Check if need to recalibrate positions
       if (min < 0.000001) {
@@ -208,13 +208,13 @@ export const Content = () => {
         setError(error)
         return
       } else {
-        // if (sharedId) {
-        //   supabase.channel(`document:${sharedId}`).send({
-        //     type: "broadcast",
-        //     event: 'changes',
-        //     payload: {...changed_cloned, id}
-        //   })
-        // }
+        if (sharedId) {
+          supabase.channel(`document:${sharedId}`).send({
+            type: "broadcast",
+            event: 'changes',
+            payload: {...changed_cloned, id}
+          })
+        }
       }
       setSaved(new Date())
     }
@@ -241,35 +241,34 @@ export const Content = () => {
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        
+        refChanges.current = ({...refChanges.current, toBroadcast: true, positions: {...refChanges.current.positions, [indexOrderedArray[newPos].id]: newPosition}})
       } else if (newPos === blocks.length-1) {
         const prevPosition = blocks[newPos].position
         const nextPosition = blocks[newPos].position+100
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        refChanges.current = ({...refChanges.current, toBroadcast: true, positions: {...refChanges.current.positions, [indexOrderedArray[newPos].id]: newPosition}})
       } else if (newPos > originalPos) {
         const prevPosition = blocks[newPos].position
         const nextPosition = blocks[newPos+1].position
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        refChanges.current = ({...refChanges.current, toBroadcast: true, positions: {...refChanges.current.positions, [indexOrderedArray[newPos].id]: newPosition}})
       } else if (newPos < originalPos) {
         const prevPosition = blocks[newPos-1].position
         const nextPosition = blocks[newPos].position
         const newPosition = (prevPosition+nextPosition)/2
         indexOrderedArray[newPos].position = newPosition
 
-        setChanges(changes => ({...changes, toBroadcast: true, positions: {...changes.positions, [indexOrderedArray[newPos].id]: newPosition}}))
+        refChanges.current = ({...refChanges.current, toBroadcast: true, positions: {...refChanges.current.positions, [indexOrderedArray[newPos].id]: newPosition}})
       }
 
       return indexOrderedArray
     })
   }
-
-  console.log(changes.updates)
 
   useEffect(() => {
     const getBlocks = async (doc_id) => {
@@ -292,7 +291,7 @@ export const Content = () => {
       }
     }
   
-    setChanges(defaultChanges)
+    refChanges.current = (defaultChanges)
     getBlocks(params.doc_id)
   }, [params.doc_id])
 
@@ -316,6 +315,7 @@ export const Content = () => {
     )
   }
 
+
   return (
     <div className='h-full flex flex-col font-inter gap-1 justify-top items-center overflow-y-scroll'>
       <div className='w-full bg-[#191919] py-2 px-4 flex flex-wrap items-center justify-end gap-4 text-sm'>
@@ -332,8 +332,8 @@ export const Content = () => {
           <BlocksHolder
             blocks={blocks}
             setBlocks={setBlocks} 
-            changes={changes}
-            setChanges={setChanges} 
+            refChanges={refChanges}
+            setBroadcastAux={setBroadcastAux}
             setError={setError} 
             setLoading={setLoading} 
             doc_id={params.doc_id}
@@ -342,15 +342,4 @@ export const Content = () => {
       </div>
     </div>
   )
-}
-
-
-
-const refChangesToStateChanges = (refChanges) => {
-  /*
-    refChanges[deletes] => array of ids
-    refChanges[updates] => array of refs
-    refChanges[new_block] => array of objects
-    refChanges[positions] => array of ids
-  */
 }

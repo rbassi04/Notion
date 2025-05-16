@@ -13,7 +13,7 @@ const defaultContent = {
 }
 
 // BlockRenderer.jsx
-export default function BlockRenderer({ idx, block, blocks, setBlocks, changes, setChanges, doc_id }) {
+export default function BlockRenderer({ idx, block, blocks, setBlocks, refChanges, doc_id, setBroadcastAux }) {
   const {attributes, listeners, setNodeRef, 
     transform, transition} = useSortable({id: block.id})
 
@@ -24,11 +24,8 @@ export default function BlockRenderer({ idx, block, blocks, setBlocks, changes, 
 
   async function deleteBlock(id) {
     // Update changes
-    setChanges(changes => {
-      changes["deletes"].push(id)
-      changes.toBroadcast = true
-      return changes
-    })
+    refChanges.current["deletes"].push(id)
+    refChanges.current.toBroadcast = true
 
     // Update blocks
     setBlocks(blocks => blocks.filter(_block => _block.id !== id))
@@ -36,7 +33,7 @@ export default function BlockRenderer({ idx, block, blocks, setBlocks, changes, 
   }
 
   async function addBlock(type) {
-    const changed_cloned = {...changes}
+    const changed_cloned = {...refChanges.current}
 
     // Get new position
     const prevPos = blocks[idx].position
@@ -56,14 +53,14 @@ export default function BlockRenderer({ idx, block, blocks, setBlocks, changes, 
 
     // use setBlocks to add block on client side
     setBlocks(blocks => {
+      const updatedBlocks = [...blocks]; // clone to trigger rerender
       if (idx === blocks.length) {
-        blocks.push(newBlock)
-        return blocks
+        updatedBlocks.push(newBlock);
       } else {
-        blocks.splice(idx+1, 0, newBlock)
-        return blocks
+        updatedBlocks.splice(idx + 1, 0, newBlock);
       }
-    })
+      return updatedBlocks;
+    });
 
     changed_cloned['new_block'].push(newBlock)
     changed_cloned['positions'][block.id]
@@ -71,7 +68,12 @@ export default function BlockRenderer({ idx, block, blocks, setBlocks, changes, 
     // currChanges.toBroadcast = true
 
     // No need to handle precision of position, it will be handled before save
-    setChanges(changed_cloned)
+    refChanges.current = changed_cloned
+  }
+
+  function setChanges(cb) {
+    setBroadcastAux(n => (n+1)%11)
+    refChanges.current = cb(refChanges.current)
   }
 
   return (

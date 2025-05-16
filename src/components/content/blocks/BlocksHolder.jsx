@@ -13,10 +13,10 @@ const defaultContent = {
   'image': ''
 }
 
-export const BlocksHolder = ({blocks, setBlocks, changes, setChanges, setError, setLoading, doc_id}) => {
+export const BlocksHolder = ({blocks, setBlocks, refChanges, setError, setLoading, doc_id, setBroadcastAux}) => {
 
   async function addBlock(type) {
-    const changed_cloned = {...changes}
+    const changed_cloned = {...refChanges.current}
 
     // Get new position
     const newPosition = 0
@@ -33,13 +33,18 @@ export const BlocksHolder = ({blocks, setBlocks, changes, setChanges, setError, 
     }
 
     // use setBlocks to add block on client side
-    blocks.push(newBlock)
+    setBlocks(blocks => {
+      const updatedBlocks = [...blocks]; // clone to trigger rerender
+      updatedBlocks.push(newBlock);
+      return updatedBlocks;
+    });
+
 
     changed_cloned['new_block'].push(newBlock)
     changed_cloned.toBroadcast = true
 
     // No need to handle precision of position, it will be handled before save
-    setChanges(changed_cloned)
+    refChanges.current = changed_cloned
   }
 
   return (
@@ -57,11 +62,11 @@ export const BlocksHolder = ({blocks, setBlocks, changes, setChanges, setError, 
                 block={block}
                 blocks={blocks}
                 setBlocks={setBlocks}
-                changes = {changes}
-                setChanges={setChanges}
+                refChanges = {refChanges}
                 setError={setError}
                 setLoading={setLoading}
                 doc_id={doc_id}
+                setBroadcastAux={setBroadcastAux}
               />
           )
         }
