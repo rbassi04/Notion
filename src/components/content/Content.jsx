@@ -27,14 +27,15 @@ export const Content = () => {
     const [loading, setLoading] = useState(true);
     const [saved, setSaved] = useState(new Date());
     const [sharedId, setSharedId] = useState(null);
-
     const [broadcastAux, setBroadcastAux] = useState(0);
+    const [prevPayload, setPrevPayload] = useState([]);
 
     // (key, value) => (block_id, new content)
     const refChanges = useRef(defaultChanges);
 
     useEffect(() => {
         function messageRecieved(payload) {
+            console.log("id: ", id, payload.payload.id);
             if (id === payload.payload.id) return;
             broadcastSave(payload.payload);
         }
@@ -82,47 +83,6 @@ export const Content = () => {
         // Cleanup to cancel debounce on unmount
         return () => debouncedSave.cancel();
     }, [refChanges.current, broadcastAux, debouncedSave]);
-
-    function broadcastChanges() {
-        const changes = refChanges.current;
-        if (
-            Object.keys(changes["updates"]).length ||
-            Object.keys(changes["positions"]).length ||
-            changes["deletes"].length ||
-            changes["new_block"].length
-        ) {
-            // Prepare payload
-            for (let delete_id of changes["deletes"]) {
-                delete changes["updates"][delete_id];
-            }
-
-            for (let delete_id of changes["deletes"]) {
-                delete changes["positions"][delete_id];
-            }
-
-            const min = getMinPositionDistance(blocks);
-
-            const changed_cloned = { ...changes };
-
-            // Check if need to recalibrate positions
-            if (min < 0.000001) {
-                let index = 100;
-                for (let block of blocks) {
-                    // Upadte positions
-                    changed_cloned["positions"][block.id] = index * 100;
-                    index += 1;
-                }
-            }
-
-            if (sharedId) {
-                supabase.channel(`document:${sharedId}`).send({
-                    type: "broadcast",
-                    event: "changes",
-                    payload: { ...changed_cloned, id },
-                });
-            }
-        }
-    }
 
     const broadcastSave = (changes) => {
         if (!changes) return;
@@ -362,7 +322,7 @@ export const Content = () => {
             <div className="w-full bg-[#191919] py-2 px-4 flex flex-wrap items-center justify-end gap-4 text-sm">
                 <p className="text-[#e7e7e7] mr-2">
                     {sharedId &&
-                        `Share link: https://notion-cloney.netlify.app/document/${sharedId}`}
+                        `Share link: https://notion-cloney.netlify.app/share/${sharedId}`}
                 </p>
                 <p className="text-[#e7e7e7]">
                     Last saved:{" "}
