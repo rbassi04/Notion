@@ -25,7 +25,7 @@ export const BlockCode = ({block, setChanges}) => {
           ...currChanges['updates'],
           [block.id]: e.target.value
         },
-        toBroadcast: true
+        toBroadcast: true,
       })
     )
   }

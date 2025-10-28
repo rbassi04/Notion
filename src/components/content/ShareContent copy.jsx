@@ -372,7 +372,7 @@ export const ShareContent = () => {
     return (
         <div className="h-full flex flex-col font-inter gap-1 justify-top items-center overflow-y-scroll">
             <div className="w-full bg-[#191919] py-2 px-4 flex flex-wrap items-center justify-end gap-4 text-sm">
-                <p className="text-[#e7e7e7] mr-2">Share id: https://notion-cloney.netlify.app/share/{params.doc_id}</p>
+                <p className="text-[#e7e7e7] mr-2">Share id: {params.doc_id}</p>
                 <p className="text-[#e7e7e7]">
                     Last saved:{" "}
                     {saved.getHours() +
