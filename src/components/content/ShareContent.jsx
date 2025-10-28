@@ -59,12 +59,12 @@ export const ShareContent = () => {
             }
         }
 
-        // const interval = setInterval(() => manualSave(), 10000)
+        const interval = setInterval(() => manualSave(), 5000)
 
         // Unsubscribe from channel
         return () => {
             supabase.channel(`document:${params.shared_id}`).unsubscribe();
-            // clearInterval(interval)
+            clearInterval(interval)
         };
     }, [blocks]);
 
@@ -119,6 +119,7 @@ export const ShareContent = () => {
                     event: "changes",
                     payload: { ...changed_cloned, id },
                 });
+                refChanges.current = defaultChanges
             }
         }
     }
@@ -165,8 +166,6 @@ export const ShareContent = () => {
                 }
                 return blk;
             });
-
-            console.log("POS BLOCKS: ", pos_blocks)
 
             return orderBlocks(pos_blocks);
         });
