@@ -46,6 +46,12 @@ export default function App() {
   if (!session) {
     return (
       <div className='bg-black h-screen'>
+        <div>
+          <h1 className='text-3xl text-white font-bold text-center pt-5 pb-3'>DEMO ACCOUNT:</h1>
+          <p className='text-lg text-white text-center '><b>Email: </b> xzsyxsnejkrmxkzmcn@nespj.com</p>
+          <p className='text-lg text-white text-center '><b>Password: </b> xzsyxsnejkrmxkzmcn@nespj.com</p>
+        </div>
+
         <Auth supabaseClient={supabase} appearance={{ theme: ThemeSupa }} theme='dark' providers={[]} />
       </div>
     )
