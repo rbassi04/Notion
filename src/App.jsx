@@ -52,7 +52,9 @@ export default function App() {
           <p className='text-lg text-white text-center '><b>Password: </b> xzsyxsnejkrmxkzmcn@nespj.com</p>
         </div>
 
-        <Auth supabaseClient={supabase} appearance={{ theme: ThemeSupa }} theme='dark' providers={[]} />
+        <div className='max-w-4xl mx-auto'>
+          <Auth supabaseClient={supabase} appearance={{ theme: ThemeSupa }} theme='dark' providers={[]} />
+        </div>
       </div>
     )
   }
