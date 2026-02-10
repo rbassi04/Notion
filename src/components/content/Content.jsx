@@ -31,6 +31,8 @@ export const Content = () => {
     const [broadcastAux, setBroadcastAux] = useState(0);    // toggle to notify changes
     const [prevPayload, setPrevPayload] = useState([]);
 
+    console.log("BLOCK: " , blocks)
+
 
     // (key, value) => (block_id, new content)
     const refChanges = useRef(defaultChanges);
@@ -364,7 +366,7 @@ export const Content = () => {
                 </DndContext>
             </div>
             <div className="absolute right-6 bottom-3">
-                <Chatbot />
+                <Chatbot blocks={blocks} setBlocks={setBlocks} />
             </div>
         </div>
     );

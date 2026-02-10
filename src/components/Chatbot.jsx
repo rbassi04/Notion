@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 
-export default function Chatbot() {
+export default function Chatbot({blocks, setBlocks}) {
   const [messages, setMessages] = useState([
     { role: "assistant", content: "Hey! How can I help?" }
   ]);
@@ -25,11 +25,19 @@ export default function Chatbot() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                messages: [...messages, userMessage]
+                messages: [...messages, userMessage],
+                blocks: blocks.map(block => ({id: block.id, type: block.type, content: block.content, position: block.position}))
             })
       });
 
       const data = await res.json();
+      const reply = JSON.parse(data.reply)
+
+      if (reply.mode == "brainstorm") {
+
+      } else if (reply.mode == "edit") {
+        
+      }
 
       setMessages(prev => [
         ...prev,
