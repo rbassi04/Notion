@@ -6,6 +6,7 @@ import { BlocksHolder } from "./blocks/BlocksHolder";
 import { arrayMove } from "@dnd-kit/sortable";
 import getMinPositionDistance, { orderBlocks } from "./util";
 import { debounce } from "lodash";
+import Chatbot from "../Chatbot"
 
 const DEBOUNCE_MS = 500;
 
@@ -27,8 +28,9 @@ export const Content = () => {
     const [loading, setLoading] = useState(true);
     const [saved, setSaved] = useState(new Date());
     const [sharedId, setSharedId] = useState(null);
-    const [broadcastAux, setBroadcastAux] = useState(0);
+    const [broadcastAux, setBroadcastAux] = useState(0);    // toggle to notify changes
     const [prevPayload, setPrevPayload] = useState([]);
+
 
     // (key, value) => (block_id, new content)
     const refChanges = useRef(defaultChanges);
@@ -360,6 +362,9 @@ export const Content = () => {
                         doc_id={params.doc_id}
                     />
                 </DndContext>
+            </div>
+            <div className="absolute right-6 bottom-3">
+                <Chatbot />
             </div>
         </div>
     );
