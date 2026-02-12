@@ -1,0 +1,1 @@
+console.log(JSON.parse('{\n  "response": "Hello! How can I assist you today?"\n}'))
