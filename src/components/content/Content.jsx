@@ -7,6 +7,7 @@ import { arrayMove } from "@dnd-kit/sortable";
 import getMinPositionDistance, { orderBlocks } from "./util";
 import { debounce } from "lodash";
 import Chatbot from "../Chatbot"
+import { v4 as uuidv4 } from 'uuid';
 
 const DEBOUNCE_MS = 500;
 
@@ -29,10 +30,8 @@ export const Content = () => {
     const [saved, setSaved] = useState(new Date());
     const [sharedId, setSharedId] = useState(null);
     const [broadcastAux, setBroadcastAux] = useState(0);    // toggle to notify changes
-    const [prevPayload, setPrevPayload] = useState([]);
 
     console.log("BLOCK: " , blocks)
-
 
     // (key, value) => (block_id, new content)
     const refChanges = useRef(defaultChanges);
@@ -49,6 +48,7 @@ export const Content = () => {
             blocks[0]["documents"] &&
             blocks[0]["documents"]["shared_id"]
         ) {
+            // open a supabase channel to listen to changes
             const shared_id = blocks[0]["documents"]["shared_id"];
             setSharedId(shared_id);
 
@@ -267,6 +267,62 @@ export const Content = () => {
         });
     }
 
+    function handleAIUpdate(newBlocks) {
+        let changed_cloned = {...refChanges.current}
+        setBlocks(_blocks => {
+            let prev = [..._blocks]; // clone to trigger rerender
+
+            for (const change of newBlocks) {
+                // is the change "insert" | "update" | "delete"
+                if (change.operation == "insert") {
+                    // insert a new block -> generate id
+                    const new_block = {
+                        id: uuidv4(),
+                        doc_id: params.doc_id,
+                        type: change.type,
+                        content: change.content,
+                        position: change.position
+                    }
+                    console.log("Insert: ", change, " -> ", new_block)
+                    prev.push(new_block)
+
+                    changed_cloned['new_block'].push(new_block)
+                    changed_cloned.toBroadcast = true
+
+                } else if (change.operation == "update") {
+                    // update the content
+                    prev = prev.map(block => {
+                        if (block.id == change.id) {
+                            changed_cloned['updates'][block.id] = change.content
+
+                            return ({
+                                ...block,
+                                content: change.content,
+                                position: change.position,
+                                type: change.type
+                            })
+                        }
+                        return block
+                    })
+                    console.log("Update: ", change, " -> ...")
+                } else if (change.operation == "delete") {
+                    // Update changes
+                    changed_cloned["deletes"].push(id)
+                    changed_cloned.toBroadcast = true
+
+                    // Update blocks
+                    prev = prev.filter(_block => _block.id !== change.id)
+                    console.log("Delete: ", change, " -> ...")
+                }
+            }
+            // No need to handle precision of position, it will be handled before save
+            refChanges.current = changed_cloned
+            console.log("///// // /////  END  ///// // /////")
+
+            return orderBlocks(prev)
+        });
+    }
+
     useEffect(() => {
         const getBlocks = async (doc_id) => {
             // Get blocks
@@ -366,7 +422,7 @@ export const Content = () => {
                 </DndContext>
             </div>
             <div className="absolute right-6 bottom-3">
-                <Chatbot blocks={blocks} setBlocks={setBlocks} />
+                <Chatbot blocks={blocks} setBlocks={setBlocks} handleAIUpdate={handleAIUpdate} />
             </div>
         </div>
     );

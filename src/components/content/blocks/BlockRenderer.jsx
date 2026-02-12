@@ -29,7 +29,6 @@ export default function BlockRenderer({ idx, block, blocks, setBlocks, refChange
 
     // Update blocks
     setBlocks(blocks => blocks.filter(_block => _block.id !== id))
-
   }
 
   async function addBlock(type) {
@@ -65,7 +64,6 @@ export default function BlockRenderer({ idx, block, blocks, setBlocks, refChange
     changed_cloned['new_block'].push(newBlock)
     changed_cloned['positions'][block.id]
     changed_cloned.toBroadcast = true
-    // currChanges.toBroadcast = true
 
     // No need to handle precision of position, it will be handled before save
     refChanges.current = changed_cloned

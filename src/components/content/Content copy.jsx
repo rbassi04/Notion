@@ -28,7 +28,6 @@ export const Content = () => {
     const [saved, setSaved] = useState(new Date());
     const [sharedId, setSharedId] = useState(null);
     const [broadcastAux, setBroadcastAux] = useState(0);
-    const [prevPayload, setPrevPayload] = useState([]);
 
     // (key, value) => (block_id, new content)
     const refChanges = useRef(defaultChanges);

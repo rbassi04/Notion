@@ -12,6 +12,7 @@ export default function App() {
   const [workshop, setWorkshop] = useState({error: null, data: []})
   const [loading, setLoading] = useState(false)
 
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)

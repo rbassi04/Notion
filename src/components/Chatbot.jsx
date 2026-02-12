@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 
-export default function Chatbot({blocks, setBlocks}) {
+export default function Chatbot({blocks, setBlocks, handleAIUpdate}) {
   const [messages, setMessages] = useState([
     { role: "assistant", content: "Hey! How can I help?" }
   ]);
@@ -14,6 +14,32 @@ export default function Chatbot({blocks, setBlocks}) {
 
   async function sendMessage() {
     if (!input.trim() || loading) return;
+
+    if (false) {
+      console.log("///// // ///// START ///// // /////")
+      handleAIUpdate([
+        {
+            "operation": "insert",
+            "id": "e7ac12c8-bd3e-4e14-8e3e-9c9c0c01c5b4",
+            "type": "heading",
+            "content": "New Heading",
+            "position": 1
+        },
+        {
+            "operation": "update",
+            "id": "c06b9114-4754-4614-bc8a-c121efcab5e7",
+            "type": "quote",
+            "content": "Updated quote content.",
+            "position": 25
+        },
+        {
+            "operation": "delete",
+            "id": "0198644e-a718-4750-a611-133635856805"
+        }
+      ])
+      console.log("///// // /////  END  ///// // /////")
+      return
+    }
 
     const userMessage = { role: "user", content: input };
     setMessages(prev => [...prev, userMessage]);
@@ -44,61 +70,6 @@ export default function Chatbot({blocks, setBlocks}) {
 
       console.log("Parsed AI reply:", rep);
 
-      // `
-      // { 
-      //   "mode": "brainstorm", 
-      //   "ideas": [ 
-      //     "Include a strong objective statement that highlights your career goals and skills.", 
-      //     "List your work experience in reverse chronological order, emphasizing achievements.", 
-      //     "Highlight relevant skills such as technical proficiencies, languages, and soft skills.", 
-      //     "Add sections for education, certifications, and professional development.", 
-      //     "Consider using bullet points for clarity and ease of reading.", 
-      //     "Incorporate quantifiable metrics to demonstrate your impact in previous roles.", 
-      //     "Tailor your resume for each job application to align with the job description." 
-      //   ] 
-      // }
-      // `
-
-      // `
-      // { 
-      //   "mode": "insert", 
-      //   "operations": [ 
-      //     { 
-      //       "action": "insert", 
-      //       "block": { "id": "block-1", "type": "heading", "content": "Resume Tips", "position": 1 } 
-      //     }, 
-      //     { 
-      //       "action": "insert", 
-      //       "block": { "id": "block-2", "type": "text", "content": "Include a strong objective statement that highlights your career goals and skills.", "position": 2 } 
-      //     }, 
-      //     { 
-      //       "action": "insert", 
-      //       "block": { "id": "block-3", "type": "text", "content": "List your work experience in reverse chronological order, emphasizing achievements.", "position": 3 } 
-      //     }, 
-      //     { 
-      //       "action": "insert", 
-      //       "block": { "id": "block-4", "type": "text", "content": "Highlight relevant skills such as technical proficiencies, languages, and soft skills.", "position": 4 } 
-      //     }, 
-      //     { 
-      //       "action": "insert", 
-      //       "block": { "id": "block-5", "type": "text", "content": "Add sections for education, certifications, and professional development.", "position": 5 } 
-      //     }, 
-      //     { 
-      //       "action": "insert", 
-      //       "block": { "id": "block-6", "type": "text", "content": "Consider using bullet points for clarity and ease of reading.", "position": 6 } 
-      //     }, 
-      //     { 
-      //       "action": "insert", 
-      //       "block": { "id": "block-7", "type": "text", "content": "Incorporate quantifiable metrics to demonstrate your impact in previous roles.", "position": 7 } 
-      //     }, 
-      //     { 
-      //       "action": "insert", 
-      //       "block": { "id": "block-8", "type": "text", "content": "Tailor your resume for each job application to align with the job description.", "position": 8 } 
-      //     } 
-      //   ] 
-      // }
-      // `
-
       // For normal text responses
       if (rep.response) {
         setMessages(prev => [
@@ -111,7 +82,9 @@ export default function Chatbot({blocks, setBlocks}) {
       // For block operations (array)
       else if (Array.isArray(rep)) {
         // Update blocks and messages if needed
-        setBlocks(prev => [...prev, ...rep]);
+        console.log("TY")
+        handleAIUpdate(rep)
+        console.log("TY END")
         setMessages(prev => [
           ...prev,
           { role: "assistant", content: "Document updated ✅" }
@@ -132,7 +105,7 @@ export default function Chatbot({blocks, setBlocks}) {
   }
 
   return (
-    <div style={styles.container} className="bg-slate-500 min-h-96">
+    <div style={styles.container} className="bg-slate-500 h-96 w-120">
       <div style={styles.chat}>
         {messages.map((m, i) => (
           <div
